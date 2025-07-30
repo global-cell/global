@@ -3,7 +3,7 @@ import { LogOut, Vote, Check, BarChart3 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 
 interface VotingInterfaceProps {
-  voter: { id: string; name: string; address: string }
+  voter: { id: string; name: string; address: string; voted_for: string | null }
   onLogout: () => void
 }
 
@@ -34,6 +34,12 @@ export function VotingInterface({ voter, onLogout }: VotingInterfaceProps) {
   const [myVote, setMyVote] = useState<string | null>(null)
 
   useEffect(() => {
+    // Set initial vote from voter data if available
+    if (voter.voted_for) {
+      setHasVoted(true)
+      setSelectedCandidate(voter.voted_for)
+      setMyVote(voter.voted_for)
+    }
     checkIfVoted()
     fetchVoteCounts()
     subscribeToVotes()
@@ -120,18 +126,35 @@ export function VotingInterface({ voter, onLogout }: VotingInterfaceProps) {
       if (existingVote) {
         setHasVoted(true)
         setSelectedCandidate(existingVote.candidate_name)
+        // Update voter record with their choice
+        await supabase
+          .from('voters')
+          .update({ voted_for: existingVote.candidate_name })
+          .eq('id', voter.id)
         alert('Anda sudah memberikan suara sebelumnya.')
         return
       }
 
-      const { error } = await supabase
+      // Insert vote
+      const { error: voteError } = await supabase
         .from('votes')
         .insert([{
           candidate_name: candidateName,
           user_id: voter.id
         }])
 
-      if (error) throw error
+      if (voteError) throw voteError
+
+      // Update voter record with their choice
+      const { error: voterError } = await supabase
+        .from('voters')
+        .update({ voted_for: candidateName })
+        .eq('id', voter.id)
+
+      if (voterError) {
+        console.error('Error updating voter record:', voterError)
+        // Don't throw error here as the vote was already recorded
+      }
 
       setHasVoted(true)
       setSelectedCandidate(candidateName)

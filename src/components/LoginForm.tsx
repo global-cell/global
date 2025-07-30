@@ -55,7 +55,8 @@ export function LoginForm({ onLogin }: LoginFormProps) {
       onLogin({
         id: voterData.id,
         name: voterData.name,
-        address: voterData.address
+        address: voterData.address,
+        voted_for: voterData.voted_for
       })
     } catch (error) {
       console.error('Error creating voter:', error)

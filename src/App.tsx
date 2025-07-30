@@ -7,6 +7,7 @@ interface Voter {
   id: string
   name: string
   address: string
+  voted_for: string | null
 }
 
 function App() {

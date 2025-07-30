@@ -30,6 +30,7 @@ export type Voter = {
   id: string
   name: string
   address: string
+  voted_for: string | null
   created_at: string
 }
 

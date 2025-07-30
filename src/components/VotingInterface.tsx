@@ -31,6 +31,7 @@ export function VotingInterface({ voter, onLogout }: VotingInterfaceProps) {
   const [voteCounts, setVoteCounts] = useState<VoteCount[]>([])
   const [totalVotes, setTotalVotes] = useState(0)
   const [isVoting, setIsVoting] = useState(false)
+  const [myVote, setMyVote] = useState<string | null>(null)
 
   useEffect(() => {
     checkIfVoted()
@@ -54,6 +55,7 @@ export function VotingInterface({ voter, onLogout }: VotingInterfaceProps) {
       if (data) {
         setHasVoted(true)
         setSelectedCandidate(data.candidate_name)
+        setMyVote(data.candidate_name)
       }
     } catch (error) {
       console.error('Error checking vote status:', error)
@@ -133,6 +135,7 @@ export function VotingInterface({ voter, onLogout }: VotingInterfaceProps) {
 
       setHasVoted(true)
       setSelectedCandidate(candidateName)
+      setMyVote(candidateName)
       
       // Refresh vote counts setelah voting berhasil
       await fetchVoteCounts()
@@ -142,6 +145,16 @@ export function VotingInterface({ voter, onLogout }: VotingInterfaceProps) {
         // Unique constraint violation - user sudah vote
         alert('Anda sudah memberikan suara sebelumnya.')
         await checkIfVoted()
+        // Refresh untuk mendapatkan pilihan yang sudah ada
+        const { data: existingVote } = await supabase
+          .from('votes')
+          .select('candidate_name')
+          .eq('user_id', voter.id)
+          .maybeSingle()
+        
+        if (existingVote) {
+          setMyVote(existingVote.candidate_name)
+        }
       } else {
         alert('Terjadi kesalahan saat memberikan suara. Silakan coba lagi.')
       }
@@ -192,7 +205,15 @@ export function VotingInterface({ voter, onLogout }: VotingInterfaceProps) {
               <Check className="w-5 h-5" />
               <span className="font-semibold">Terima kasih, suara Anda sudah terekam!</span>
             </div>
-            <p>Anda telah memilih: <strong>{selectedCandidate}</strong></p>
+            <p>Anda telah memilih: <strong>{myVote}</strong></p>
+            <div className="mt-3 p-3 bg-white rounded-lg border border-green-200">
+              <p className="text-sm text-green-600">
+                💡 <strong>Pilihan Anda:</strong> {myVote}
+              </p>
+              <p className="text-xs text-green-500 mt-1">
+                Suara Anda telah tersimpan dengan aman dan tidak dapat diubah
+              </p>
+            </div>
           </div>
         )}
 
@@ -201,20 +222,27 @@ export function VotingInterface({ voter, onLogout }: VotingInterfaceProps) {
             const voteData = voteCounts.find(v => v.candidate_name === candidate)
             const count = voteData?.count || 0
             const percentage = getVotePercentage(count)
+            const isMyChoice = myVote === candidate
             const isSelected = selectedCandidate === candidate
 
             return (
               <div
                 key={candidate}
-                className={`bg-white rounded-xl shadow-md p-6 transition-all hover:shadow-lg ${
-                  isSelected ? 'ring-2 ring-green-500 bg-green-50' : ''
+                className={`bg-white rounded-xl shadow-md p-6 transition-all hover:shadow-lg relative ${
+                  isMyChoice ? 'ring-2 ring-green-500 bg-green-50' : ''
                 }`}
               >
+                {isMyChoice && (
+                  <div className="absolute -top-2 -right-2 bg-green-500 text-white text-xs px-2 py-1 rounded-full font-semibold">
+                    Pilihan Saya
+                  </div>
+                )}
+                
                 <div className="text-center mb-4">
-                  <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-3 ${
-                    isSelected ? 'bg-green-500 text-white' : 'bg-blue-100 text-blue-600'
+                  <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-3 relative ${
+                    isMyChoice ? 'bg-green-500 text-white' : 'bg-blue-100 text-blue-600'
                   }`}>
-                    {isSelected ? (
+                    {isMyChoice ? (
                       <Check className="w-8 h-8" />
                     ) : (
                       <Vote className="w-8 h-8" />
@@ -234,7 +262,7 @@ export function VotingInterface({ voter, onLogout }: VotingInterfaceProps) {
                   <div className="w-full bg-gray-200 rounded-full h-2">
                     <div
                       className={`h-2 rounded-full transition-all duration-500 ${
-                        isSelected ? 'bg-green-500' : 'bg-blue-500'
+                        isMyChoice ? 'bg-green-500' : 'bg-blue-500'
                       }`}
                       style={{ width: `${percentage}%` }}
                     />
@@ -246,13 +274,13 @@ export function VotingInterface({ voter, onLogout }: VotingInterfaceProps) {
                   disabled={hasVoted || isVoting}
                   className={`w-full py-2 px-4 rounded-lg font-semibold text-sm transition-all ${
                     hasVoted
-                      ? isSelected
+                      ? isMyChoice
                         ? 'bg-green-500 text-white cursor-default'
                         : 'bg-gray-300 text-gray-500 cursor-not-allowed'
                       : 'bg-blue-600 text-white hover:bg-blue-700 hover:scale-105'
                   }`}
                 >
-                  {isVoting ? 'Memproses...' : hasVoted ? (isSelected ? 'Terpilih' : 'Tidak Aktif') : 'Pilih'}
+                  {isVoting ? 'Memproses...' : hasVoted ? (isMyChoice ? 'Pilihan Saya' : 'Tidak Aktif') : 'Pilih'}
                 </button>
               </div>
             )

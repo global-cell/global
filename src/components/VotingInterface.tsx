@@ -46,6 +46,11 @@ export function VotingInterface({ voter, onLogout }: VotingInterfaceProps) {
         .eq('user_id', voter.id)
         .maybeSingle()
 
+      if (error && error.code !== 'PGRST116') {
+        console.error('Error checking vote status:', error)
+        return
+      }
+
       if (data) {
         setHasVoted(true)
         setSelectedCandidate(data.candidate_name)
@@ -72,6 +77,13 @@ export function VotingInterface({ voter, onLogout }: VotingInterfaceProps) {
       setTotalVotes(data?.length || 0)
     } catch (error) {
       console.error('Error fetching vote counts:', error)
+      // Set default values jika terjadi error
+      const defaultCounts = CANDIDATES.map(candidate => ({
+        candidate_name: candidate,
+        count: 0
+      }))
+      setVoteCounts(defaultCounts)
+      setTotalVotes(0)
     }
   }
 
@@ -96,6 +108,20 @@ export function VotingInterface({ voter, onLogout }: VotingInterfaceProps) {
 
     setIsVoting(true)
     try {
+      // Cek sekali lagi apakah user sudah vote (untuk mencegah double voting)
+      const { data: existingVote } = await supabase
+        .from('votes')
+        .select('*')
+        .eq('user_id', voter.id)
+        .maybeSingle()
+
+      if (existingVote) {
+        setHasVoted(true)
+        setSelectedCandidate(existingVote.candidate_name)
+        alert('Anda sudah memberikan suara sebelumnya.')
+        return
+      }
+
       const { error } = await supabase
         .from('votes')
         .insert([{
@@ -107,9 +133,18 @@ export function VotingInterface({ voter, onLogout }: VotingInterfaceProps) {
 
       setHasVoted(true)
       setSelectedCandidate(candidateName)
+      
+      // Refresh vote counts setelah voting berhasil
+      await fetchVoteCounts()
     } catch (error) {
       console.error('Error voting:', error)
-      alert('Terjadi kesalahan saat memberikan suara. Silakan coba lagi.')
+      if (error.code === '23505') {
+        // Unique constraint violation - user sudah vote
+        alert('Anda sudah memberikan suara sebelumnya.')
+        await checkIfVoted()
+      } else {
+        alert('Terjadi kesalahan saat memberikan suara. Silakan coba lagi.')
+      }
     } finally {
       setIsVoting(false)
     }

@@ -10,29 +10,56 @@ export function LoginForm({ onLogin }: LoginFormProps) {
   const [name, setName] = useState('')
   const [address, setAddress] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState('')
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!name.trim() || !address.trim()) return
+    if (!name.trim() || !address.trim()) {
+      setError('Nama dan alamat harus diisi')
+      return
+    }
 
     setIsLoading(true)
+    setError('')
+    
     try {
-      const { data, error } = await supabase
+      // Cek apakah voter dengan nama dan alamat yang sama sudah ada
+      const { data: existingVoter, error: checkError } = await supabase
         .from('voters')
-        .insert([{ name: name.trim(), address: address.trim() }])
-        .select()
-        .single()
+        .select('*')
+        .eq('name', name.trim())
+        .eq('address', address.trim())
+        .maybeSingle()
 
-      if (error) throw error
+      if (checkError && checkError.code !== 'PGRST116') {
+        throw checkError
+      }
+
+      let voterData
+      
+      if (existingVoter) {
+        // Jika voter sudah ada, gunakan data yang ada
+        voterData = existingVoter
+      } else {
+        // Jika voter belum ada, buat voter baru
+        const { data, error } = await supabase
+          .from('voters')
+          .insert([{ name: name.trim(), address: address.trim() }])
+          .select()
+          .single()
+
+        if (error) throw error
+        voterData = data
+      }
 
       onLogin({
-        id: data.id,
-        name: data.name,
-        address: data.address
+        id: voterData.id,
+        name: voterData.name,
+        address: voterData.address
       })
     } catch (error) {
       console.error('Error creating voter:', error)
-      alert('Terjadi kesalahan saat login. Silakan coba lagi.')
+      setError('Terjadi kesalahan saat login. Silakan coba lagi.')
     } finally {
       setIsLoading(false)
     }
@@ -52,6 +79,12 @@ export function LoginForm({ onLogin }: LoginFormProps) {
             Silakan isi data diri Anda untuk melanjutkan
           </p>
         </div>
+
+        {error && (
+          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg mb-6">
+            {error}
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-6">
           <div>
@@ -96,6 +129,10 @@ export function LoginForm({ onLogin }: LoginFormProps) {
             {isLoading ? 'Memproses...' : 'Masuk ke Pemilihan'}
           </button>
         </form>
+
+        <div className="mt-6 text-center text-sm text-gray-500">
+          <p>Sistem akan otomatis membuat akun baru jika belum terdaftar</p>
+        </div>
       </div>
     </div>
   )

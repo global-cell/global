@@ -16,6 +16,6 @@ export type Voter = {
 export type Vote = {
   id: string
   candidate_name: string
-  voter_id: string
+  user_id: string
   created_at: string
 }

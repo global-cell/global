@@ -43,7 +43,7 @@ export function VotingInterface({ voter, onLogout }: VotingInterfaceProps) {
       const { data, error } = await supabase
         .from('votes')
         .select('*')
-        .eq('voter_id', voter.id)
+        .eq('user_id', voter.id)
         .maybeSingle()
 
       if (data) {
@@ -100,7 +100,7 @@ export function VotingInterface({ voter, onLogout }: VotingInterfaceProps) {
         .from('votes')
         .insert([{
           candidate_name: candidateName,
-          voter_id: voter.id
+          user_id: voter.id
         }])
 
       if (error) throw error
